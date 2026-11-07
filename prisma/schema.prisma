@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String           @id @default(cuid())
+  name            String
+  email           String           @unique
+  // API validation restricts this to PATIENT or PROVIDER.
+  role            String           @default("PATIENT")
+  patientProfile  PatientProfile?
+  providerVisits  Appointment[]    @relation("ProviderAppointments")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model PatientProfile {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  mrn               String     @unique
+  dateOfBirth       DateTime
+  sex               String
+  diagnosis         String     @default("")
+  weightKg          Float
+  heightCm          Float
+  activityFactor    Float      @default(1.2)
+  targetCalories    Int
+  targetProtein     Float
+  targetCarbs       Float      @default(0)
+  targetFat         Float      @default(0)
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meals             MealLog[]
+  appointments      Appointment[] @relation("PatientAppointments")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+model MealLog {
+  id          String         @id @default(cuid())
+  patientId   String
+  type        String
+  description String
+  kcal        Int
+  protein     Float
+  carbs       Float
+  fat         Float
+  sodium      Int
+  loggedAt    DateTime       @default(now())
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+
+  @@index([patientId, loggedAt])
+}
+
+model Appointment {
+  id             String         @id @default(cuid())
+  providerId     String
+  patientId      String
+  scheduledAt    DateTime
+  jitsiRoomId    String         @unique
+  status         String         @default("SCHEDULED")
+  provider       User           @relation("ProviderAppointments", fields: [providerId], references: [id], onDelete: Restrict)
+  patient        PatientProfile @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([patientId, scheduledAt])
+  @@index([providerId, scheduledAt])
+}
