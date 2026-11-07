@@ -18,6 +18,12 @@ const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: "heuristics", label: "Heuristics & Matrix Evaluation", icon: "fa-clipboard-check" },
 ];
 
+const patientLabels: Partial<Record<TabId, string>> = {
+  workflow: "My Overview",
+  meallog: "My Meals & Nutrition",
+  telehealth: "My Virtual Visit",
+};
+
 type WorkflowStepperProps = {
   activeTab: TabId;
   onChange: (tab: TabId) => void;
@@ -76,14 +82,15 @@ export function WorkflowStepper({ activeTab, onChange, role }: WorkflowStepperPr
               key={tab.id}
               type="button"
               onClick={() => onChange(tab.id)}
-              className={`flex items-center space-x-2 border-b-2 px-4 py-3 focus:outline-none ${
+              aria-current={activeTab === tab.id ? "page" : undefined}
+              className={`flex items-center space-x-2 border-b-2 px-4 py-3 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-300 sm:text-sm ${
                 activeTab === tab.id
                   ? "border-teal-400 text-teal-300"
                   : "border-transparent hover:text-slate-100"
               }`}
             >
               <i className={`fa-solid ${tab.icon}`} aria-hidden="true" />
-              <span>{tab.label}</span>
+              <span>{role === "patient" ? patientLabels[tab.id] : tab.label}</span>
             </button>
           ))}
         </div>

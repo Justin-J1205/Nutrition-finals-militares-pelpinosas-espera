@@ -24,6 +24,7 @@ type JitsiTelehealthProps = { patient: Patient; role: AuthRole };
 
 export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,6 +40,9 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
     setAppointments([]);
     setSelectedAppointment("");
     setCallActive(false);
+    setError("");
+    setNotice("");
+    setAppointmentsLoading(true);
     fetch(`/api/appointments?patientId=${encodeURIComponent(patient.id)}`)
       .then(async (response) => {
         const result = (await response.json()) as {
@@ -55,6 +59,9 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
         if (active) {
           setError(loadError instanceof Error ? loadError.message : "Unable to load appointments.");
         }
+      })
+      .finally(() => {
+        if (active) setAppointmentsLoading(false);
       });
     return () => {
       active = false;
@@ -160,14 +167,20 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
           <span>WebRTC Tele-nutrition Virtual Consultation</span>
         </h2>
         <p className="mt-1 text-xs text-slate-500">
-          Schedule a patient visit and launch a dedicated Jitsi room linked to the saved appointment.
+          {role === "provider"
+            ? `Schedule a visit for ${patient.user.name}. The appointment will have its own video room.`
+            : "Your provider will schedule your visit. When an appointment is available, choose Join Virtual Session."}
         </p>
       </header>
 
       <div className={`grid grid-cols-1 gap-6 ${role === "provider" ? "lg:grid-cols-3" : ""}`}>
-        {role === "provider" && <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+        {role === "provider" && (
+          <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
           <div>
             <h3 className="mb-3 text-sm font-bold text-slate-900">Schedule an appointment</h3>
+            <p className="mb-3 text-xs leading-relaxed text-slate-600">
+              Choose a future date and time in your local time zone.
+            </p>
             <form onSubmit={bookAppointment} className="space-y-3">
               <label htmlFor="appointment-time" className="block text-xs font-semibold text-slate-600">
                 Appointment date &amp; time
@@ -198,7 +211,11 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
 
           <div>
             <h3 className="mb-2 text-sm font-bold text-slate-900">Patient appointments</h3>
-            {appointments.length === 0 ? (
+            {appointmentsLoading ? (
+              <p role="status" className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                Loading appointment schedule...
+              </p>
+            ) : appointments.length === 0 ? (
               <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
                 No appointments scheduled. Choose a future time above to create a Jitsi room.
               </p>
@@ -229,9 +246,8 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
               </div>
             )}
           </div>
-          {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
-          {notice && <p role="status" className="text-xs text-emerald-700">{notice}</p>}
-        </section>}
+          </section>
+        )}
 
         <section className={`overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-md ${role === "provider" ? "lg:col-span-2" : ""}`}>
           <div className="flex flex-col justify-between gap-3 border-b border-slate-800 p-4 sm:flex-row sm:items-center">
@@ -248,7 +264,7 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
             ) : (
               <button
                 onClick={() => setCallActive(true)}
-                disabled={!appointment}
+                disabled={!appointment || appointmentsLoading}
                 className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <i className="fa-solid fa-video mr-2" aria-hidden="true" />
@@ -265,14 +281,18 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
                   <i className="fa-solid fa-video" aria-hidden="true" />
                 </div>
                 <p className="text-sm font-semibold text-slate-300">
-                  {appointment
+                  {appointmentsLoading
+                    ? "Loading appointment schedule..."
+                    : appointment
                     ? role === "patient"
                       ? "Your virtual session is ready to join"
                       : "Your appointment room is ready"
                     : "No appointment is available"}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {appointment
+                  {appointmentsLoading
+                    ? "Please wait while we check for scheduled visits."
+                    : appointment
                     ? `Scheduled for ${new Date(appointment.scheduledAt).toLocaleString()}`
                     : role === "provider"
                       ? `Schedule a visit for ${patient.user.name} to create a unique room.`
@@ -283,6 +303,16 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
           </div>
         </section>
       </div>
+      {error && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+          {notice}
+        </p>
+      )}
     </div>
   );
 }

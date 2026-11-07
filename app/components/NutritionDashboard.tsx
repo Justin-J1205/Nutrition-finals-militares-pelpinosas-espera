@@ -226,14 +226,16 @@ function AdimeNotes({ patient }: { patient: Patient }) {
       <section className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center">
         <div>
           <h2 className="text-base font-bold text-slate-900">eNCPT ADIME Clinical Documentation</h2>
-          <p className="mt-1 text-xs text-slate-500">Electronic Nutrition Care Process Terminology structured for clinical notes.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Electronic Nutrition Care Process Terminology structured for clinical notes. ADIME notes are not yet saved to the patient record.
+          </p>
         </div>
         <button
-          onClick={() => setNotice("ADIME note saved for this session.")}
+          onClick={() => setNotice("Marked for this session only. No note was saved to the patient record.")}
           className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
         >
           <i className="fa-solid fa-floppy-disk mr-2" aria-hidden="true" />
-          Commit ADIME Note
+          Mark note for this session
         </button>
       </section>
 

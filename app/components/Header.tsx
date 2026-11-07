@@ -24,7 +24,7 @@ export function Header({
   return (
     <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900 text-white shadow-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 py-3 md:h-16 md:flex-row md:items-center md:justify-between md:py-0">
           <div className="flex items-center space-x-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 text-lg font-bold text-white shadow-inner">
               <i className="fa-solid fa-heart-pulse" aria-hidden="true" />
@@ -45,25 +45,29 @@ export function Header({
           </div>
 
           {role === "provider" && (
-            <label className="hidden items-center space-x-3 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 md:flex">
+            <label className="flex min-w-0 items-center space-x-3 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5">
               <i className="fa-solid fa-hospital-user text-sm text-teal-400" aria-hidden="true" />
               <span className="text-xs font-medium text-slate-400">Active Patient:</span>
               <select
                 value={patientId}
                 onChange={(event) => onPatientChange(event.target.value)}
-                className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-xs font-semibold text-white focus:border-teal-500 focus:outline-none"
+                className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-xs font-semibold text-white focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-400 md:flex-initial"
                 aria-label="Active patient"
               >
                 {patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
-                    {patient.user.name} ({patient.mrn})
+                    {patient.user.name} (
+                    {piiMasked
+                      ? `MRN-****-${patient.mrn.slice(-5)}`
+                      : patient.mrn}
+                    )
                   </option>
                 ))}
               </select>
             </label>
           )}
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center justify-between gap-3 md:justify-start md:space-x-4">
             {role === "provider" && (
               <div className="flex items-center space-x-2 rounded-lg border border-slate-700 bg-slate-800/90 px-3 py-1.5">
                 <i className="fa-solid fa-user-shield text-xs text-amber-400" aria-hidden="true" />

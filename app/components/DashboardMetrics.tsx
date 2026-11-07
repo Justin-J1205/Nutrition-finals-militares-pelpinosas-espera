@@ -27,13 +27,16 @@ export function DashboardMetrics({
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div className="flex items-start space-x-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-300 bg-slate-100 text-xl font-bold text-slate-500">
-              <i className="fa-solid fa-user-doctor" aria-hidden="true" />
+              <i
+                className={`fa-solid ${role === "provider" ? "fa-user-doctor" : "fa-user"}`}
+                aria-hidden="true"
+              />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-xl font-bold text-slate-900">
                   {role === "patient"
-                    ? `Welcome, ${patient.user.name}`
+                    ? `Your nutrition overview`
                     : piiMasked
                       ? `Patient #${patientNumber}`
                       : patient.user.name}
@@ -45,18 +48,14 @@ export function DashboardMetrics({
                 )}
               </div>
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-slate-500">
-                <span>
-                  MRN:{" "}
-                  <strong className="text-slate-700">
-                    {role === "patient"
-                      ? "Your profile"
-                      : piiMasked
-                        ? `MRN-****-${patientNumber}`
-                        : patient.mrn}
-                  </strong>
-                </span>
                 {role === "provider" && (
                   <>
+                    <span>
+                      MRN:{" "}
+                      <strong className="text-slate-700">
+                        {piiMasked ? `MRN-****-${patientNumber}` : patient.mrn}
+                      </strong>
+                    </span>
                     <span>
                       DOB:{" "}
                       <strong className="text-slate-700">
@@ -95,6 +94,11 @@ export function DashboardMetrics({
             </button>
           </div>
         </div>
+        <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-600">
+          {role === "patient"
+            ? `Hello ${patient.user.name}. Your nutrition targets and today's progress are below. Use My Meals to record food or check your daily intake.`
+            : "Select a patient above, then review today's intake, clinical alerts, and care plan."}
+        </p>
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -120,14 +124,61 @@ export function DashboardMetrics({
           iconClass={flagged ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}
           alert={flagged}
         />
-        <Metric
-          title="Meals Logged Today"
-          value={`${meals.length} meals`}
-          detail="Active eNCPT care plan"
-          icon="fa-file-medical"
-          iconClass="bg-emerald-50 text-emerald-600"
-        />
+        {role === "patient" ? (
+          <Metric
+            title="Protein today"
+            value={`${totals.protein} g`}
+            detail={`of ${patient.targetProtein} g daily target`}
+            icon="fa-drumstick-bite"
+            iconClass="bg-emerald-50 text-emerald-600"
+          />
+        ) : (
+          <Metric
+            title="Meals Logged Today"
+            value={`${meals.length} meals`}
+            detail="Active eNCPT care plan"
+            icon="fa-file-medical"
+            iconClass="bg-emerald-50 text-emerald-600"
+          />
+        )}
       </section>
+
+      {role === "patient" && (
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <button
+            onClick={() => onNavigate("meallog")}
+            className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-xs transition hover:border-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+          >
+            <span className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-900">Today's meals</span>
+              <i className="fa-solid fa-arrow-right text-teal-600" aria-hidden="true" />
+            </span>
+            <span className="mt-2 block text-xs text-slate-600">
+              {meals.length === 0
+                ? "No meals recorded yet. Add your first meal to get started."
+                : `${meals.length} ${meals.length === 1 ? "meal" : "meals"} recorded. View your intake and nutrition charts.`}
+            </span>
+            <span className="mt-3 inline-flex items-center text-xs font-semibold text-teal-700">
+              {meals.length === 0 ? "Log a meal" : "View meal log"}
+            </span>
+          </button>
+          <button
+            onClick={() => onNavigate("telehealth")}
+            className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-xs transition hover:border-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+          >
+            <span className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-900">Virtual visits</span>
+              <i className="fa-solid fa-video text-teal-600" aria-hidden="true" />
+            </span>
+            <span className="mt-2 block text-xs text-slate-600">
+              Join a scheduled video visit with your care provider.
+            </span>
+            <span className="mt-3 inline-flex items-center text-xs font-semibold text-teal-700">
+              View appointment
+            </span>
+          </button>
+        </section>
+      )}
 
       {role === "provider" && <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
         <h3 className="mb-2 flex items-center space-x-2 text-base font-bold text-slate-900">
