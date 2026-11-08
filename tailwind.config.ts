@@ -20,8 +20,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        sans: ["Inter", "Arial", "sans-serif"],
+        mono: ["Inter", "Arial", "sans-serif"],
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(15 23 42 / 0.05)",

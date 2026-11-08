@@ -15,6 +15,7 @@ model User {
   role            String         @default("PATIENT")
   patientProfile  PatientProfile?
   providerVisits  Appointment[]    @relation("ProviderAppointments")
+  adimeNotes      AdimeNote[]      @relation("ProviderAdimeNotes")
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -36,6 +37,7 @@ model PatientProfile {
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   meals             MealLog[]
   appointments      Appointment[] @relation("PatientAppointments")
+  adimeNotes        AdimeNote[]   @relation("PatientAdimeNotes")
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 }
@@ -71,4 +73,22 @@ model Appointment {
 
   @@index([patientId, scheduledAt])
   @@index([providerId, scheduledAt])
+}
+
+model AdimeNote {
+  id            String         @id @default(cuid())
+  patientId     String
+  providerId    String
+  problemCode   String
+  etiology      String
+  signs         String
+  assessment    String
+  intervention  String
+  monitoring    String
+  patient       PatientProfile @relation("PatientAdimeNotes", fields: [patientId], references: [id], onDelete: Cascade)
+  provider      User           @relation("ProviderAdimeNotes", fields: [providerId], references: [id], onDelete: Restrict)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([patientId, providerId])
 }

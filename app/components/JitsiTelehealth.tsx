@@ -20,14 +20,15 @@ declare global {
   }
 }
 
-type JitsiTelehealthProps = { patient: Patient; role: AuthRole };
+type JitsiTelehealthProps = { patient: Patient; role: AuthRole; userName: string };
 
-export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
+export function JitsiTelehealth({ patient, role, userName }: JitsiTelehealthProps) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [callActive, setCallActive] = useState(false);
@@ -80,7 +81,9 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
         width: "100%",
         height: "100%",
         parentNode: container,
-        userInfo: { displayName: "Sarah Jenkins (RD Provider)" },
+        userInfo: {
+          displayName: role === "patient" ? patient.user.name : userName,
+        },
         configOverwrite: {
           startWithAudioMuted: false,
           disableThirdPartyRequests: true,
@@ -111,7 +114,7 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
       apiRef.current = null;
       container.replaceChildren();
     };
-  }, [appointment, callActive]);
+  }, [appointment, callActive, patient.user.name, role, userName]);
 
   async function bookAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -150,6 +153,36 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
       setError(bookError instanceof Error ? bookError.message : "Unable to schedule appointment.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function cancelAppointment(appointmentId: string) {
+    const appointmentToCancel = appointments.find((item) => item.id === appointmentId);
+    if (!appointmentToCancel || !window.confirm("Cancel and remove this appointment?")) return;
+    setDeletingId(appointmentId);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/appointments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Unable to cancel appointment.");
+      const remaining = appointments.filter((item) => item.id !== appointmentId);
+      setAppointments(remaining);
+      if (selectedAppointment === appointmentId) {
+        apiRef.current?.dispose();
+        apiRef.current = null;
+        setCallActive(false);
+        setSelectedAppointment(remaining[0]?.id ?? "");
+      }
+      setNotice("Appointment canceled and removed from the schedule.");
+    } catch (cancelError) {
+      setError(cancelError instanceof Error ? cancelError.message : "Unable to cancel appointment.");
+    } finally {
+      setDeletingId("");
     }
   }
 
@@ -222,26 +255,42 @@ export function JitsiTelehealth({ patient, role }: JitsiTelehealthProps) {
             ) : (
               <div className="space-y-2">
                 {appointments.map((item) => (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedAppointment(item.id);
-                      setCallActive(false);
-                    }}
-                    className={`w-full rounded-lg border p-3 text-left ${
+                    className={`flex items-center gap-2 rounded-lg border p-2 ${
                       selectedAppointment === item.id
                         ? "border-teal-500 bg-teal-50"
-                        : "border-slate-200 bg-white hover:border-slate-300"
+                        : "border-slate-200 bg-white"
                     }`}
                   >
-                    <span className="block text-xs font-semibold text-slate-800">
-                      {new Date(item.scheduledAt).toLocaleString()}
-                    </span>
-                    <span className="mt-1 block truncate font-mono text-[10px] text-slate-500">
-                      Room: {item.jitsiRoomId}
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAppointment(item.id);
+                        setCallActive(false);
+                      }}
+                      className="min-w-0 flex-1 p-1 text-left"
+                      aria-pressed={selectedAppointment === item.id}
+                    >
+                      <span className="block text-xs font-semibold text-slate-800">
+                        {new Date(item.scheduledAt).toLocaleString()}
+                      </span>
+                      <span className="mt-1 block truncate text-[10px] text-slate-500">
+                        Room: {item.jitsiRoomId}
+                      </span>
+                    </button>
+                    {role === "provider" && (
+                      <button
+                        type="button"
+                        onClick={() => void cancelAppointment(item.id)}
+                        disabled={Boolean(deletingId)}
+                        aria-label={`Cancel appointment scheduled ${new Date(item.scheduledAt).toLocaleString()}`}
+                        className="shrink-0 rounded-md border border-red-200 px-2 py-1.5 text-[11px] font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingId === item.id ? "Canceling..." : "Cancel"}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

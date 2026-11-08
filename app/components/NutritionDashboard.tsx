@@ -30,12 +30,14 @@ type NutritionDashboardProps = {
   role: AuthRole;
   userId: string;
   patientId: string | null;
+  userName: string;
 };
 
 export function NutritionDashboard({
   role,
   userId,
   patientId: sessionPatientId,
+  userName,
 }: NutritionDashboardProps) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [patientId, setPatientId] = useState(sessionPatientId ?? "");
@@ -124,6 +126,7 @@ export function NutritionDashboard({
         piiMasked={piiMasked}
         onTogglePii={() => setPiiMasked((current) => !current)}
         role={role}
+        userName={userName}
       />
       <WorkflowStepper activeTab={activeTab} onChange={setActiveTab} role={role} />
 
@@ -160,7 +163,7 @@ export function NutritionDashboard({
               </div>
             )}
             {role === "provider" && activeTab === "encpt" && <AdimeNotes patient={patient} />}
-            {activeTab === "telehealth" && <JitsiTelehealth patient={patient} role={role} />}
+            {activeTab === "telehealth" && <JitsiTelehealth patient={patient} role={role} userName={userName} />}
             {role === "provider" && activeTab === "fhir" && <FhirExport patient={patient} piiMasked={piiMasked} />}
             {role === "provider" && activeTab === "heuristics" && <Heuristics />}
           </div>
@@ -168,122 +171,193 @@ export function NutritionDashboard({
       </main>
 
       <footer className="border-t border-slate-800 bg-slate-900 py-4 text-xs text-slate-400">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 font-mono text-[11px] sm:flex-row">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 text-[11px] sm:flex-row">
           <div>
-            <span>NutriCare Tele-nutrition Platform © 2026</span>
+            <span>NutriCare Tele-nutrition Platform</span>
             <span className="mx-2">|</span>
-            <span>HIPAA Safe Harbor Compliant</span>
+            <span>University capstone demonstration</span>
           </div>
-          <div className="flex space-x-4">
-            <span>eNCPT v2024 Taxonomy</span>
-            <span>HL7 FHIR R4 Ready</span>
-            <span>WebRTC Encrypted</span>
-          </div>
+          <span>Use demo records for presentation and testing</span>
         </div>
       </footer>
     </div>
   );
 }
 
-function AdimeNotes({ patient }: { patient: Patient }) {
-  const [problem, setProblem] = useState("NI-5.4");
-  const [etiology, setEtiology] = useState(
-    "frequent consumption of high-sodium processed foods and restaurant meals",
-  );
-  const [signs, setSigns] = useState("daily sodium intake above the recommended limit");
-  const problemLabel: Record<string, string> = {
-    "NI-5.4": "Excessive Sodium Intake (NI-5.4)",
-    "NI-2.1": "Inadequate Oral Intake (NI-2.1)",
-    "NC-2.2": "Impaired Nutrient Utilization (NC-2.2)",
-    "NB-1.1": "Food & Nutrition Knowledge Deficit (NB-1.1)",
-    "NI-5.1": "Excessive Fat Intake (NI-5.1)",
-    "NC-3.3": "Undesirable Weight Loss (NC-3.3)",
+const problemLabels: Record<string, string> = {
+  "NI-5.4": "Excessive Sodium Intake (NI-5.4)",
+  "NI-2.1": "Inadequate Oral Intake (NI-2.1)",
+  "NC-2.2": "Impaired Nutrient Utilization (NC-2.2)",
+  "NB-1.1": "Food & Nutrition Knowledge Deficit (NB-1.1)",
+  "NI-5.1": "Excessive Fat Intake (NI-5.1)",
+  "NC-3.3": "Undesirable Weight Loss (NC-3.3)",
+};
+
+type AdimeDraft = {
+  problemCode: string;
+  etiology: string;
+  signs: string;
+  assessment: string;
+  intervention: string;
+  monitoring: string;
+};
+
+function defaultAdimeDraft(patient: Patient): AdimeDraft {
+  return {
+    problemCode: "NI-5.4",
+    etiology: "",
+    signs: "",
+    assessment: `${patient.user.name} presents for nutrition assessment. Current weight ${patient.weightKg} kg, height ${patient.heightCm} cm.`,
+    intervention: `Nutrition prescription: target ${patient.targetCalories} kcal and ${patient.targetProtein} g protein per day.`,
+    monitoring: "Re-evaluate dietary intake and nutrition goals at follow-up.",
   };
-  const diagnosis = `${problemLabel[problem]} related to ${etiology || "..."} as evidenced by ${signs || "..."}.`;
-  const [assessment, setAssessment] = useState(
-    `${patient.user.name} presents for nutrition assessment. Current weight ${patient.weightKg} kg, height ${patient.heightCm} cm.`,
-  );
-  const [intervention, setIntervention] = useState(
-    `Nutrition prescription: target ${patient.targetCalories} kcal and ${patient.targetProtein} g protein per day. Set patient-centered dietary goals.`,
-  );
-  const [monitoring, setMonitoring] = useState("Re-evaluate dietary intake and nutrition goals at follow-up.");
+}
+
+function AdimeNotes({ patient }: { patient: Patient }) {
+  const [draft, setDraft] = useState(() => defaultAdimeDraft(patient));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const sections: {
-    letter: string;
-    title: string;
-    value: string;
-    readOnly: boolean;
-    onChange: (value: string) => void;
-  }[] = [
-    { letter: "A", title: "Assessment (Anthropometric, Biochemical, Dietary)", value: assessment, readOnly: false, onChange: setAssessment },
-    { letter: "D", title: "Diagnosis (Standardized eNCPT Domain)", value: diagnosis, readOnly: true, onChange: () => undefined },
-    { letter: "I", title: "Intervention (Prescription & Goals)", value: intervention, readOnly: false, onChange: setIntervention },
-    { letter: "M", title: "Monitoring & Evaluation (KPIs & Indicators)", value: monitoring, readOnly: false, onChange: setMonitoring },
-  ];
+  const diagnosis = `${problemLabels[draft.problemCode]} related to ${draft.etiology || "..."} as evidenced by ${draft.signs || "..."}.`;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    setNotice("");
+    setDraft(defaultAdimeDraft(patient));
+    fetch(`/api/adime?patientId=${encodeURIComponent(patient.id)}`)
+      .then(async (response) => {
+        const result = (await response.json()) as {
+          note?: AdimeDraft | null;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(result.error || "Unable to load the ADIME note.");
+        if (active && result.note) setDraft(result.note);
+      })
+      .catch((loadError: unknown) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : "Unable to load the ADIME note.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [patient]);
+
+  function updateDraft(field: keyof AdimeDraft, value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  async function saveNote(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/adime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId: patient.id, ...draft }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Unable to save the ADIME note.");
+      setNotice("ADIME note saved to this patient's record.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to save the ADIME note.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={saveNote} className="space-y-6">
       <section className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center">
         <div>
           <h2 className="text-base font-bold text-slate-900">eNCPT ADIME Clinical Documentation</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Electronic Nutrition Care Process Terminology structured for clinical notes. ADIME notes are not yet saved to the patient record.
+            Notes are saved to the selected patient's record and can be updated by this provider.
           </p>
         </div>
         <button
-          onClick={() => setNotice("Marked for this session only. No note was saved to the patient record.")}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
+          type="submit"
+          disabled={loading || saving}
+          className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <i className="fa-solid fa-floppy-disk mr-2" aria-hidden="true" />
-          Mark note for this session
+          {loading ? "Loading note..." : saving ? "Saving..." : "Save ADIME note"}
         </button>
       </section>
 
+      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</p>}
+      {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{notice}</p>}
+
       <section className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-6 text-white shadow-md">
-        <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
           <i className="fa-solid fa-wand-magic-sparkles text-lg text-teal-400" aria-hidden="true" />
           <h3 className="text-sm font-bold">Interactive eNCPT PES Statement Generator</h3>
         </div>
-        <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-3">
-          <label className="text-teal-400">
-            1. Nutrition Problem Code (P)
-            <select value={problem} onChange={(event) => setProblem(event.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-teal-400 focus:outline-none">
-              {Object.entries(problemLabel).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-            </select>
-          </label>
-          <label className="text-teal-400">
-            2. Etiology / Root Cause (E)
-            <input value={etiology} onChange={(event) => setEtiology(event.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-teal-400 focus:outline-none" />
-          </label>
-          <label className="text-teal-400">
-            3. Signs &amp; Symptoms (S)
-            <input value={signs} onChange={(event) => setSigns(event.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-teal-400 focus:outline-none" />
-          </label>
-        </div>
-        <div className="rounded-lg border border-teal-500/30 bg-slate-950 p-4 font-mono text-xs text-teal-200">
-          <span className="mb-1 block text-xs font-bold uppercase text-teal-400">Generated Standardized PES Diagnosis:</span>
-          {diagnosis}
-        </div>
+        {loading ? (
+          <p role="status" className="text-xs text-slate-300">Loading this patient's saved chart note...</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-3">
+              <label className="text-teal-300">
+                Nutrition Problem Code (P)
+                <select
+                  value={draft.problemCode}
+                  onChange={(event) => updateDraft("problemCode", event.target.value)}
+                  className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-teal-400 focus:outline-none"
+                >
+                  {Object.entries(problemLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+              <label className="text-teal-300">
+                Etiology / Root Cause (E)
+                <input required maxLength={5000} value={draft.etiology} onChange={(event) => updateDraft("etiology", event.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-teal-400 focus:outline-none" />
+              </label>
+              <label className="text-teal-300">
+                Signs &amp; Symptoms (S)
+                <input required maxLength={5000} value={draft.signs} onChange={(event) => updateDraft("signs", event.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-teal-400 focus:outline-none" />
+              </label>
+            </div>
+            <div className="rounded-lg border border-teal-500/30 bg-slate-950 p-4 text-xs text-teal-200">
+              <span className="mb-1 block text-xs font-bold uppercase text-teal-300">Generated Standardized PES Diagnosis</span>
+              {diagnosis}
+            </div>
+          </>
+        )}
       </section>
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {sections.map((section) => (
-          <label key={section.letter} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 text-sm font-bold text-teal-700 shadow-xs">
-            <span className="flex items-center space-x-2 border-b border-slate-200 pb-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded bg-teal-100 font-mono text-teal-800">{section.letter}</span>
-              <span>{section.title}</span>
-            </span>
-            <textarea
-              rows={5}
-              readOnly={section.readOnly}
-              value={section.value}
-              onChange={(event) => section.onChange(event.target.value)}
-              className="w-full rounded border border-slate-300 p-3 font-mono text-xs font-normal text-slate-800 focus:border-teal-500 focus:outline-none"
-            />
-          </label>
-        ))}
-      </section>
-      {notice && <p role="status" className="text-xs text-emerald-700">{notice}</p>}
-    </div>
+      {!loading && (
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {[
+            { letter: "A", title: "Assessment (Anthropometric, Biochemical, Dietary)", field: "assessment" as const, value: draft.assessment },
+            { letter: "D", title: "Diagnosis (Standardized eNCPT Domain)", field: null, value: diagnosis },
+            { letter: "I", title: "Intervention (Prescription & Goals)", field: "intervention" as const, value: draft.intervention },
+            { letter: "M", title: "Monitoring & Evaluation (KPIs & Indicators)", field: "monitoring" as const, value: draft.monitoring },
+          ].map((section) => (
+            <label key={section.letter} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 text-sm font-bold text-teal-800 shadow-xs">
+              <span className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded bg-teal-100">{section.letter}</span>
+                <span>{section.title}</span>
+              </span>
+              <textarea
+                rows={5}
+                readOnly={section.field === null}
+                value={section.value}
+                maxLength={5000}
+                onChange={(event) => {
+                  if (section.field) updateDraft(section.field, event.target.value);
+                }}
+                className="w-full rounded border border-slate-300 p-3 text-xs font-normal text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+              />
+            </label>
+          ))}
+        </section>
+      )}
+    </form>
   );
 }

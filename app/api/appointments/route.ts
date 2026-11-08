@@ -81,3 +81,31 @@ export async function POST(request: Request) {
   });
   return NextResponse.json({ appointment }, { status: 201 });
 }
+
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+  if (session.role !== "provider") {
+    return NextResponse.json({ error: "Provider access required." }, { status: 403 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+  }
+  if (typeof body.appointmentId !== "string" || !body.appointmentId.trim()) {
+    return NextResponse.json({ error: "An appointment ID is required." }, { status: 400 });
+  }
+
+  const result = await prisma.appointment.deleteMany({
+    where: { id: body.appointmentId, providerId: session.userId },
+  });
+  if (result.count === 0) {
+    return NextResponse.json({ error: "Appointment not found or you do not have permission to cancel it." }, { status: 404 });
+  }
+  return NextResponse.json({ success: true });
+}

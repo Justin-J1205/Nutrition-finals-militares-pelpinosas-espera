@@ -10,6 +10,7 @@ type HeaderProps = {
   piiMasked: boolean;
   onTogglePii: () => void;
   role: AuthRole;
+  userName: string;
 };
 
 export function Header({
@@ -19,102 +20,102 @@ export function Header({
   piiMasked,
   onTogglePii,
   role,
+  userName,
 }: HeaderProps) {
   const currentPatient = patients.find((patient) => patient.id === patientId);
+  const displayName = role === "provider" ? userName : currentPatient?.user.name ?? userName;
+  const initials = displayName
+    .split(" ")
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900 text-white shadow-md">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-3 py-3 md:h-16 md:flex-row md:items-center md:justify-between md:py-0">
-          <div className="flex items-center space-x-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 text-lg font-bold text-white shadow-inner">
-              <i className="fa-solid fa-heart-pulse" aria-hidden="true" />
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-slate-900 text-white shadow-sm">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-6 lg:h-16 lg:flex-nowrap lg:px-8 lg:py-0">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-700 text-lg text-white">
+            <i className="fa-solid fa-heart-pulse" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <p className="whitespace-nowrap text-base font-bold tracking-tight">
+              NutriCare<span className="font-medium text-teal-300"> EHR</span>
+            </p>
+            <p className="truncate text-[11px] text-slate-400">Tele-nutrition care platform</p>
+          </div>
+        </div>
+
+        {role === "provider" && (
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 lg:max-w-sm">
+            <i className="fa-solid fa-hospital-user shrink-0 text-sm text-teal-300" aria-hidden="true" />
+            <span className="shrink-0 text-xs font-medium text-slate-300">Patient</span>
+            <select
+              value={patientId}
+              onChange={(event) => onPatientChange(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+              aria-label="Active patient"
+              disabled={patients.length === 0}
+            >
+              {patients.length === 0 ? (
+                <option value="">No patient records</option>
+              ) : (
+                patients.map((patient) => (
+                  <option key={patient.id} value={patient.id} className="bg-slate-900">
+                    {patient.user.name} · {piiMasked ? `MRN-****-${patient.mrn.slice(-5)}` : patient.mrn}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+        )}
+
+        <div className="ml-auto flex items-center gap-3">
+          {role === "provider" && (
+            <button
+              type="button"
+              onClick={onTogglePii}
+              className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 transition hover:border-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+              role="switch"
+              aria-checked={piiMasked}
+              aria-label={`${piiMasked ? "Disable" : "Enable"} patient identifier masking`}
+              title={piiMasked ? "Patient identifiers are masked" : "Patient identifiers are visible"}
+            >
+              <i className="fa-solid fa-shield-halved text-teal-300" aria-hidden="true" />
+              <span className="hidden sm:inline">PII {piiMasked ? "masked" : "visible"}</span>
+              <span
+                className={`relative h-4 w-7 rounded-full transition-colors ${
+                  piiMasked ? "bg-teal-600" : "bg-slate-600"
+                }`}
+                aria-hidden="true"
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${
+                    piiMasked ? "translate-x-3.5" : "translate-x-0.5"
+                  }`}
+                />
+              </span>
+            </button>
+          )}
+          <div className="hidden items-center gap-2 border-l border-slate-700 pl-3 sm:flex">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-teal-200">
+              {initials}
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-lg font-bold tracking-tight text-white">
-                  NutriCare<span className="font-normal text-teal-400">EHR</span>
-                </span>
-                <span className="rounded border border-teal-700 bg-teal-900/80 px-2 py-0.5 font-mono text-xs text-teal-300">
-                  v4.2-Clinical
-                </span>
-              </div>
-              <p className="text-[11px] font-medium text-slate-400">
-                Tele-nutrition &amp; Digital Health Platform
+            <div className="max-w-48">
+              <p className="truncate text-xs font-semibold text-slate-100">{displayName}</p>
+              <p className="text-[10px] text-slate-400">
+                {role === "provider" ? "Clinical provider" : "Patient"}
               </p>
             </div>
           </div>
-
-          {role === "provider" && (
-            <label className="flex min-w-0 items-center space-x-3 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5">
-              <i className="fa-solid fa-hospital-user text-sm text-teal-400" aria-hidden="true" />
-              <span className="text-xs font-medium text-slate-400">Active Patient:</span>
-              <select
-                value={patientId}
-                onChange={(event) => onPatientChange(event.target.value)}
-                className="min-w-0 flex-1 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-xs font-semibold text-white focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-400 md:flex-initial"
-                aria-label="Active patient"
-              >
-                {patients.map((patient) => (
-                  <option key={patient.id} value={patient.id}>
-                    {patient.user.name} (
-                    {piiMasked
-                      ? `MRN-****-${patient.mrn.slice(-5)}`
-                      : patient.mrn}
-                    )
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          <div className="flex items-center justify-between gap-3 md:justify-start md:space-x-4">
-            {role === "provider" && (
-              <div className="flex items-center space-x-2 rounded-lg border border-slate-700 bg-slate-800/90 px-3 py-1.5">
-                <i className="fa-solid fa-user-shield text-xs text-amber-400" aria-hidden="true" />
-                <span className="hidden text-xs font-medium text-slate-300 sm:inline">
-                  HIPAA PII Mask
-                </span>
-                <button
-                  type="button"
-                  onClick={onTogglePii}
-                  className={`relative inline-flex h-5 w-10 flex-shrink-0 rounded-full border-2 border-transparent transition-colors ${
-                    piiMasked ? "bg-teal-600" : "bg-slate-600"
-                  }`}
-                  role="switch"
-                  aria-checked={piiMasked}
-                  aria-label="Toggle patient identifier masking"
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${
-                      piiMasked ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-            )}
-            <div className="hidden items-center space-x-2 border-l border-slate-700 pl-4 sm:flex">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-teal-500/30 bg-slate-700 text-xs font-bold text-teal-300">
-                {role === "provider" ? "RD" : currentPatient?.user.name.split(" ").map((part) => part[0]).join("")}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-200">
-                  {role === "provider" ? "Sarah Jenkins, MS, RD, LDN" : currentPatient?.user.name}
-                </p>
-                <p className="text-[10px] text-teal-400">
-                  {role === "provider" ? "Clinical Dietitian Provider" : "Patient"}
-                </p>
-              </div>
-            </div>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-teal-500 hover:text-white"
-              >
-                <i className="fa-solid fa-arrow-right-from-bracket mr-2" aria-hidden="true" />
-                Sign out
-              </button>
-            </form>
-          </div>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-teal-500 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
     </header>
